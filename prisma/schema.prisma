@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+ 
+}
+
+// ─── Auth (NextAuth required) ─────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Users & Orgs ─────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  CHEF
+  ASSOCIATE
+}
+
+model Organization {
+  id             String           @id @default(cuid())
+  name           String
+  createdAt      DateTime         @default(now())
+  users          User[]
+  vendors        Vendor[]
+  siteItems      SiteItem[]
+  invoiceItems   InvoiceItem[]
+  recipes        Recipe[]
+  categories     RecipeCategory[]
+}
+
+model User {
+  id             String       @id @default(cuid())
+  name           String?
+  email          String       @unique
+  emailVerified  DateTime?
+  image          String?
+  password       String?      // hashed, for credentials login
+  role           Role         @default(ASSOCIATE)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  accounts       Account[]
+  sessions       Session[]
+  createdAt      DateTime     @default(now())
+}
+
+// ─── Vendors ──────────────────────────────────────────────────────────────
+
+model Vendor {
+  id             String        @id @default(cuid())
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  invoiceItems   InvoiceItem[]
+  createdAt      DateTime      @default(now())
+}
+
+// ─── Site Items (canonical ingredient names) ──────────────────────────────
+
+model SiteItem {
+  id                 String             @id @default(cuid())
+  name               String
+  organizationId     String
+  organization       Organization       @relation(fields: [organizationId], references: [id])
+  conversionsPending Boolean            @default(false)
+  conversions        Conversion[]
+  invoiceItems       InvoiceItem[]
+  recipeIngredients  RecipeIngredient[]
+  createdAt          DateTime           @default(now())
+
+  @@unique([name, organizationId])
+}
+
+// ─── Invoice Items (vendor SKUs) ──────────────────────────────────────────
+
+model InvoiceItem {
+  id             String         @id @default(cuid())
+  itemCode       String
+  description    String
+  purchaseUnit   String         // "case", "box", "lb", "each", etc.
+  siteItemId     String
+  siteItem       SiteItem       @relation(fields: [siteItemId], references: [id])
+  vendorId       String
+  vendor         Vendor         @relation(fields: [vendorId], references: [id])
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  priceHistory   InvoicePrice[]
+  createdAt      DateTime       @default(now())
+
+  @@unique([itemCode, vendorId])
+}
+
+model InvoicePrice {
+  id            String      @id @default(cuid())
+  invoiceItemId String
+  invoiceItem   InvoiceItem @relation(fields: [invoiceItemId], references: [id])
+  unitPrice     Decimal     @db.Decimal(10, 4)
+  extendedPrice Decimal     @db.Decimal(10, 4)
+  qty           Decimal     @db.Decimal(10, 4)
+  invoiceDate   DateTime
+  createdAt     DateTime    @default(now())
+}
+
+// ─── Conversions ──────────────────────────────────────────────────────────
+
+model Conversion {
+  id         String    @id @default(cuid())
+  siteItemId String?   // null for system-level conversions
+  siteItem   SiteItem? @relation(fields: [siteItemId], references: [id])
+  fromUnit   String
+  fromQty    Decimal   @db.Decimal(10, 4)
+  toUnit     String
+  toQty      Decimal   @db.Decimal(10, 4)
+  isSystem   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+}
+
+// ─── Recipe Categories ────────────────────────────────────────────────────
+
+model RecipeCategory {
+  id             String       @id @default(cuid())
+  name           String
+  isSystem       Boolean      @default(false)
+  organizationId String?      // null for system categories
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  recipes        Recipe[]
+
+  @@unique([name, organizationId])
+}
+
+// ─── Recipes ──────────────────────────────────────────────────────────────
+
+model Recipe {
+  id              String             @id @default(cuid())
+  name            String
+  version         String             @default("1.0")
+  isSubRecipe     Boolean            @default(false)
+  categoryId      String
+  category        RecipeCategory     @relation(fields: [categoryId], references: [id])
+  yieldQty        Decimal            @db.Decimal(10, 4)
+  yieldUnit       String
+  menuPrice       Decimal?           @db.Decimal(10, 2)
+  targetCostPct   Decimal?           @db.Decimal(5, 2)
+  organizationId  String
+  organization    Organization       @relation(fields: [organizationId], references: [id])
+  parentVersionId String?            // points to previous version record
+  createdBy       String
+  updatedBy       String?
+  ingredients     RecipeIngredient[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+// ─── Recipe Ingredients ───────────────────────────────────────────────────
+
+model RecipeIngredient {
+  id          String    @id @default(cuid())
+  recipeId    String
+  recipe      Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  siteItemId  String?
+  siteItem    SiteItem? @relation(fields: [siteItemId], references: [id])
+  subRecipeId String?   // FK to another Recipe where isSubRecipe = true
+  quantity    Decimal   @db.Decimal(10, 4)
+  unit        String
+  sortOrder   Int       @default(0)
+}
