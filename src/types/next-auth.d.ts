@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client"
+import { Role } from "@prisma/client/default"
 import "next-auth"
 import "next-auth/jwt"
 
