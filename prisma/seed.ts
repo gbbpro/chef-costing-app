@@ -1,4 +1,5 @@
 import "dotenv/config"
+// @ts-nochec
 import { PrismaClient } from "@prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
