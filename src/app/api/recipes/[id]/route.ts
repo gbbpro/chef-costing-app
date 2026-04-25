@@ -9,33 +9,35 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params
 
-  const recipe = await prisma.recipe.findUnique({
-    where: { id, organizationId: session.user.organizationId },
-    include: {
-      category: true,
-      ingredients: {
-        include: {
-          siteItem: {
-            include: {
-              conversions: true,
-              invoiceItems: {
-                include: {
-                  priceHistory: {
-                    orderBy: { invoiceDate: "desc" },
-                    take: 1,
-                  },
+const recipe = await prisma.recipe.findUnique({
+  where: { id, organizationId: session.user.organizationId },
+  include: {
+    category: true,
+    ingredients: {
+      include: {
+        siteItem: {
+          include: {
+            conversions: true,
+            invoiceItems: {
+              include: {
+                priceHistory: {
+                  orderBy: { invoiceDate: "desc" },
+                  take: 1,
                 },
-                orderBy: { createdAt: "desc" },
-                take: 1,
               },
+              orderBy: { createdAt: "desc" },
+              take: 1,
             },
           },
         },
-        orderBy: { sortOrder: "asc" },
+        subRecipe: {
+          select: { id: true, name: true, yieldQty: true, yieldUnit: true },
+        },
       },
+      orderBy: { sortOrder: "asc" },
     },
-  })
-
+  },
+})
   if (!recipe) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   return NextResponse.json(recipe)

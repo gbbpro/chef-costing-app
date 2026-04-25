@@ -183,9 +183,10 @@ model Recipe {
   parentVersionId String?            // points to previous version record
   createdBy       String
   updatedBy       String?
-  ingredients     RecipeIngredient[]
+  ingredients     RecipeIngredient[]  @relation
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+  usedAsSubRecipeIn   RecipeIngredient[] @relation("SubRecipeIngredient")
 }
 
 // ─── Recipe Ingredients ───────────────────────────────────────────────────
@@ -197,6 +198,7 @@ model RecipeIngredient {
   siteItemId  String?
   siteItem    SiteItem? @relation(fields: [siteItemId], references: [id])
   subRecipeId String?   // FK to another Recipe where isSubRecipe = true
+  subRecipe   Recipe?   @relation("SubRecipeIngredient", fields: [subRecipeId], references: [id])
   quantity    Decimal   @db.Decimal(10, 4)
   unit        String
   sortOrder   Int       @default(0)

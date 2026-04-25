@@ -47,6 +47,7 @@ interface Recipe {
     siteItemId: string | null
     subRecipeId: string | null
     siteItem: { name: string } | null
+    subRecipe: { id: string; name: string; yieldQty: number; yieldUnit: string } | null
   }[]
 }
 
@@ -295,7 +296,7 @@ export default function RecipeDetailPage() {
             {recipe.ingredients.map((ing) => {
               const line = costMap.get(ing.id)
               const scaledQty = Number(ing.quantity) * scaleFactor
-              const name = ing.siteItem?.name ?? "Sub-recipe"
+              const name = ing.siteItem?.name ?? ing.subRecipe?.name ?? "Unknown"
 
               return (
                 <tr key={ing.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50">
