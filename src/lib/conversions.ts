@@ -151,3 +151,53 @@ export function sortUnits(units: Set<string>): string[] {
   const rest = [...units].filter((u) => !UNIT_DISPLAY_ORDER.includes(u)).sort()
   return [...ordered, ...rest]
 }
+
+// Unit promotion thresholds for scaling
+const PROMOTION_RULES: Array<{
+  fromUnit: string
+  threshold: number
+  toUnit: string
+  factor: number
+  label: string
+}> = [
+  { fromUnit: "tsp", threshold: 3, toUnit: "tbsp", factor: 1 / 3, label: "tsp → tbsp" },
+  { fromUnit: "tbsp", threshold: 4, toUnit: "cup", factor: 1 / 16, label: "tbsp → cup" },
+  { fromUnit: "cup", threshold: 4, toUnit: "qt", factor: 0.25, label: "cup → qt" },
+  { fromUnit: "qt", threshold: 2, toUnit: "gal", factor: 0.25, label: "qt → gal" },
+  { fromUnit: "oz", threshold: 16, toUnit: "lb", factor: 1 / 16, label: "oz → lb" },
+  { fromUnit: "ml", threshold: 1000, toUnit: "l", factor: 0.001, label: "ml → l" },
+  { fromUnit: "g", threshold: 1000, toUnit: "kg", factor: 0.001, label: "g → kg" },
+]
+
+export interface PromotionSuggestion {
+  ingredientId: string
+  originalQty: number
+  originalUnit: string
+  suggestedQty: number
+  suggestedUnit: string
+}
+
+export function checkUnitPromotions(
+  ingredients: Array<{ id: string; quantity: number; unit: string }>,
+  scaleFactor: number
+): PromotionSuggestion[] {
+  const suggestions: PromotionSuggestion[] = []
+
+  for (const ing of ingredients) {
+    const scaledQty = ing.quantity * scaleFactor
+    const rule = PROMOTION_RULES.find(
+      (r) => r.fromUnit === ing.unit && scaledQty >= r.threshold
+    )
+    if (rule) {
+      suggestions.push({
+        ingredientId: ing.id,
+        originalQty: scaledQty,
+        originalUnit: ing.unit,
+        suggestedQty: parseFloat((scaledQty * rule.factor).toFixed(4)),
+        suggestedUnit: rule.toUnit,
+      })
+    }
+  }
+
+  return suggestions
+}
