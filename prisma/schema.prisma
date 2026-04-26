@@ -73,6 +73,7 @@ model Organization {
   recipes        Recipe[]
   categories     RecipeCategory[]
   invites        Invite[]
+  invoices       Invoice[]
 }
 
 model User {
@@ -102,6 +103,7 @@ model Vendor {
   organization   Organization  @relation(fields: [organizationId], references: [id])
   invoiceItems   InvoiceItem[]
   createdAt      DateTime      @default(now())
+  invoices Invoice[]
 }
 
 // ─── Site Items (canonical ingredient names) ──────────────────────────────
@@ -143,6 +145,8 @@ model InvoicePrice {
   id            String      @id @default(cuid())
   invoiceItemId String
   invoiceItem   InvoiceItem @relation(fields: [invoiceItemId], references: [id])
+  invoiceId     String?     // links back to the import batch
+  invoice       Invoice?    @relation(fields: [invoiceId], references: [id])
   unitPrice     Decimal     @db.Decimal(10, 4)
   extendedPrice Decimal     @db.Decimal(10, 4)
   qty           Decimal     @db.Decimal(10, 4)
@@ -150,6 +154,20 @@ model InvoicePrice {
   createdAt     DateTime    @default(now())
 }
 
+model Invoice {
+  id             String         @id @default(cuid())
+  invoiceNumber  String
+  invoiceDate    DateTime
+  vendorId       String
+  vendor         Vendor         @relation(fields: [vendorId], references: [id])
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  totalAmount    Decimal        @db.Decimal(10, 2)
+  lineItemCount  Int
+  createdAt      DateTime       @default(now())
+  createdBy      String
+  prices         InvoicePrice[] 
+}
 // ─── Conversions ──────────────────────────────────────────────────────────
 
 model Conversion {

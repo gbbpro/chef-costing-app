@@ -14,7 +14,7 @@ export interface ImportRow {
   purchaseUnit: string
   isCatchWeight: boolean
   catchWeight: number | null
-  siteItemId: string
+  siteItemId: string | null
   vendorId: string
 }
 
@@ -29,17 +29,39 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing rows or vendor" }, { status: 400 })
   }
 
-  // Verify vendor belongs to org
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId, organizationId: session.user.organizationId },
   })
   if (!vendor) return NextResponse.json({ error: "Vendor not found" }, { status: 404 })
 
+  // Only import rows that have a siteItemId
+  const assignedRows = rows.filter((r) => r.siteItemId)
+
+  if (assignedRows.length === 0) {
+    return NextResponse.json({ error: "No assigned rows to import" }, { status: 400 })
+  }
+
+  // Create the invoice record
+  const totalAmount = assignedRows.reduce((sum, r) => sum + r.extendedPrice, 0)
+  const invoiceNumber = assignedRows[0]?.invoiceNumber ?? "UNKNOWN"
+  const invoiceDate = new Date(assignedRows[0]?.invoiceDate ?? new Date())
+
+  const invoice = await prisma.invoice.create({
+    data: {
+      invoiceNumber,
+      invoiceDate,
+      vendorId,
+      organizationId: session.user.organizationId,
+      totalAmount,
+      lineItemCount: assignedRows.length,
+      createdBy: session.user.id,
+    },
+  })
+
   let created = 0
   let updated = 0
 
-  for (const row of rows) {
-    // Upsert invoice item
+  for (const row of assignedRows) {
     const existing = await prisma.invoiceItem.findUnique({
       where: { itemCode_vendorId: { itemCode: row.itemCode, vendorId } },
     })
@@ -63,7 +85,7 @@ export async function POST(req: Request) {
           itemCode: row.itemCode,
           description: row.description,
           purchaseUnit: row.purchaseUnit,
-          siteItemId: row.siteItemId,
+          siteItemId: row.siteItemId!,
           vendorId,
           organizationId: session.user.organizationId,
         },
@@ -72,21 +94,21 @@ export async function POST(req: Request) {
       created++
     }
 
-    // Always append a new price record
     await prisma.invoicePrice.create({
       data: {
         invoiceItemId,
+        invoiceId: invoice.id,
         unitPrice: row.isCatchWeight && row.catchWeight
-          ? row.unitPrice  // already per lb
+          ? row.unitPrice
           : row.unitPrice,
         extendedPrice: row.extendedPrice,
         qty: row.isCatchWeight && row.catchWeight
-          ? row.catchWeight  // actual weight received
+          ? row.catchWeight
           : row.qty,
-        invoiceDate: new Date(row.invoiceDate),
+        invoiceDate,
       },
     })
   }
 
-  return NextResponse.json({ success: true, created, updated })
+  return NextResponse.json({ success: true, created, updated, invoiceId: invoice.id })
 }
