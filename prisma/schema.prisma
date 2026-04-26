@@ -51,6 +51,17 @@ enum Role {
   ASSOCIATE
 }
 
+model Invite {
+  id             String       @id @default(cuid())
+  email          String
+  role           Role         @default(ASSOCIATE)
+  token          String       @unique @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+}
+
 model Organization {
   id             String           @id @default(cuid())
   name           String
@@ -61,6 +72,7 @@ model Organization {
   invoiceItems   InvoiceItem[]
   recipes        Recipe[]
   categories     RecipeCategory[]
+  invites        Invite[]
 }
 
 model User {

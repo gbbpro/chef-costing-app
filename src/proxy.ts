@@ -7,7 +7,8 @@ export async function proxy(req: NextRequest) {
   const isAuth = !!token
   const isAuthPage =
     req.nextUrl.pathname.startsWith("/login") ||
-    req.nextUrl.pathname.startsWith("/register")
+    req.nextUrl.pathname.startsWith("/register") ||
+    req.nextUrl.pathname.startsWith("/accept-invite")
 
   if (isAuthPage) {
     if (isAuth) {
